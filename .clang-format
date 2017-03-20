@@ -1,0 +1,6 @@
+---
+BasedOnStyle: Google
+BreakBeforeBraces: Allman
+ColumnLimit: 0
+IndentWidth: 4
+...
