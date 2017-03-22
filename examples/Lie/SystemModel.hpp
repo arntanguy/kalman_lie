@@ -6,40 +6,8 @@
 #include <kalman_lie/NumericalDiff.hpp>
 #include <kalman_lie/LieTypes.hpp>
 
-namespace KalmanExamples
-{
 namespace Lie
 {
-/**
- * @brief System state vector-type for a 6DOF Pose
- *
- * This is a system state for a 6D Pose expressed in Lie algebra,
- * with a constant velocity model
- *
- * @param T
- */
-template <typename T>
-class State : public Sophus::SE3<T>::Tangent
-{
-   public:
-    LIE_KALMAN_VECTOR(State, T)
-
-    // //! X-position
-    // static constexpr size_t X = 0;
-    // //! Y-Position
-    // static constexpr size_t Y = 1;
-    // //! Orientation
-    // static constexpr size_t THETA = 2;
-
-    // T x()       const { return (*this)[ X ]; }
-    // T y()       const { return (*this)[ Y ]; }
-    // T theta()   const { return (*this)[ THETA ]; }
-
-    // T& x()      { return (*this)[ X ]; }
-    // T& y()      { return (*this)[ Y ]; }
-    // T& theta()  { return (*this)[ THETA ]; }
-};
-
 /**
  * @brief System control-input in se3
  *
@@ -50,17 +18,6 @@ class Control : public Sophus::SE3<T>::Tangent
 {
    public:
     LIE_KALMAN_VECTOR(Control, T)
-
-    // //! Velocity
-    // static constexpr size_t V = 0;
-    // //! Angular Rate (Orientation-change)
-    // static constexpr size_t DTHETA = 1;
-
-    // T v()       const { return (*this)[ V ]; }
-    // T dtheta()  const { return (*this)[ DTHETA ]; }
-
-    // T& v()      { return (*this)[ V ]; }
-    // T& dtheta() { return (*this)[ DTHETA ]; }
 };
 
 /**
@@ -84,8 +41,6 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
     //! No control
     typedef Kalman::Vector<T, 0> C;
 
-    S velocity;
-
     // Wraps the system model cost function in an automatic differentiation functor
     template <typename Parent>
     struct LieFunctor_ : Functor<T>
@@ -99,13 +54,19 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
         int operator()(const Eigen::VectorXd& x, Eigen::VectorXd& fvec) const
         {
             C c;
+            S xx;
+            xx.x = x.block<6,1>(0,0);
+            xx.v = x.block<6,1>(5,0);
+
+            S res = m->f(xx, c);
+
             // Cost function
-            fvec = m->f(x, c);
+            fvec << res.x, res.v;
             return 0;
         }
 
-        int inputs() const { return 6; }  // There are two parameters of the model
-        int values() const { return 6; }  // The number of observations
+        int inputs() const { return 12; }  // There are two parameters of the model
+        int values() const { return 12; }  // The number of observations
     };
     using LieFunctor = LieFunctor_<SystemModel<T>>;
 
@@ -134,7 +95,8 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 
         //! Predict given current pose and velocity
         // XXX equation for constant velocity model
-        x_ = S::Group::log(S::Group::exp(x) * S::Group::exp(velocity));
+        x_.x = S::SE3::log(S::SE3::exp(x.x) * S::SE3::exp(x.v));
+        x_.v = x.v;
 
         // Return transitioned state vector
         return x_;
@@ -159,14 +121,16 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
     void updateJacobians(const S& x, const C& u)
     {
         // F = df/dx (Jacobian of state transition w.r.t. the state)
-        this->F.setZero();
+        // this->F.setZero();
 
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(6, 6);
-        num_diff.df(Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>(x), jac);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(12, 12);
+        jac.setZero();
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx(12,1);
+        xx << x.x.matrix(), x.v.matrix();
+        num_diff.df(xx, jac);
         // std::cout << "jacobian: " << jac.matrix() << std::endl;
         this->F = jac;
     }
 };
 
 }  // namespace Robot
-}  // namespace KalmanExamples

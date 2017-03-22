@@ -3,22 +3,8 @@
 #include <kalman_lie/LieTypes.hpp>
 #include <kalman_lie/NumericalDiff.hpp>
 
-namespace KalmanExamples
-{
 namespace Lie
 {
-
-/**
- * @brief Measurement vector measuring the robot position
- *
- * @param T Numeric scalar type
- */
-template<typename T>
-class LieMeasurement : public Sophus::SE3<T>::Tangent
-{
-public:
-    LIE_KALMAN_VECTOR(LieMeasurement, T)
-};
 
 /**
  * @brief Measurement model for measuring the position of the robot
@@ -35,7 +21,7 @@ public:
  *                       coveriace square root (SquareRootBase))
  */
 template<typename T, template<class> class CovarianceBase = Kalman::StandardBase>
-class LieMeasurementModel : public Kalman::LinearizedMeasurementModel<State<T>, LieMeasurement<T>, CovarianceBase>
+class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<State<T>, LieMeasurement<T>, CovarianceBase>
 {
 public:
     //! State type shortcut definition
@@ -56,18 +42,21 @@ public:
 
         int operator()(const Eigen::VectorXd& x, Eigen::VectorXd& fvec) const
         {
+            S xx;
+            xx.x = x;
+            xx.v.setZero();
             // Cost function
-            fvec = m->h(x);
+            fvec = m->h(xx);
             return 0;
         }
 
         int inputs() const { return 6; }  // There are two parameters of the model
         int values() const { return 6; }  // The number of observations
     };
-    using LieFunctor = LieFunctor_<LieMeasurementModel<T, CovarianceBase>>;
+    using LieFunctor = LieFunctor_<LiePositionMeasurementModel<T>>;
     NumericalDiffFunctor<LieFunctor> num_diff;
 
-    LieMeasurementModel() : num_diff(this)
+    LiePositionMeasurementModel() : num_diff(this)
     {
         // Setup noise jacobian. As this one is static, we can define it once
         // and do not need to update it dynamically
@@ -84,26 +73,11 @@ public:
      * @param [in] x The system state in current time-step
      * @returns The (predicted) sensor measurement for the system state
      */
-    M h(const S& x) const
+    M h(const S& x) const override
     {
         M measurement;
-        measurement = x;
+        measurement = x.x;
         return measurement;
-        // M measurement;
-
-        // // Robot position as (x,y)-vector
-        // // This uses the Eigen template method to get the first 2 elements of the vector
-        // Kalman::Vector<T, 2> position = x.template head<2>();
-
-        // // Distance of robot to landmark 1
-        // Kalman::Vector<T, 2> delta1 = position - landmark1;
-        // measurement.d1() = std::sqrt( delta1.dot(delta1) );
-
-        // // Distance of robot to landmark 2
-        // Kalman::Vector<T, 2> delta2 = position - landmark2;
-        // measurement.d2() = std::sqrt( delta2.dot(delta2) );
-
-        // return measurement;
     }
 
 protected:
@@ -127,38 +101,12 @@ protected:
     {
         // H = dh/dx (Jacobian of measurement function w.r.t. the state)
         this->H.setZero();
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(6, 6);
-        num_diff.df(Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>(x), jac);
+        std::cout << this->H.rows() << ", " << this->H.cols() << std::endl;
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(6,12);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.x;
+        num_diff.df(xx, jac);
         this->H = jac;
-
-        // // H = dh/dx (Jacobian of measurement function w.r.t. the state)
-        // this->H.setZero();
-
-        // // Robot position as (x,y)-vector
-        // // This uses the Eigen template method to get the first 2 elements of the vector
-        // Kalman::Vector<T, 2> position = x.template head<2>();
-
-        // // Distance of robot to landmark 1
-        // Kalman::Vector<T, 2> delta1 = position - landmark1;
-
-        // // Distance of robot to landmark 2
-        // Kalman::Vector<T, 2> delta2 = position - landmark2;
-
-        // // Distances
-        // T d1 = std::sqrt( delta1.dot(delta1) );
-        // T d2 = std::sqrt( delta2.dot(delta2) );
-
-        // // partial derivative of meas.d1() w.r.t. x.x()
-        // this->H( M::D1, S::X ) = delta1[0] / d1;
-        // // partial derivative of meas.d1() w.r.t. x.y()
-        // this->H( M::D1, S::Y ) = delta1[1] / d1;
-
-        // // partial derivative of meas.d1() w.r.t. x.x()
-        // this->H( M::D2, S::X ) = delta2[0] / d2;
-        // // partial derivative of meas.d1() w.r.t. x.y()
-        // this->H( M::D2, S::Y ) = delta2[1] / d2;
     }
 };
 
 } // namespace Robot
-} // namespace KalmanExamples

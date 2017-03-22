@@ -1,19 +1,21 @@
 #include "SystemModel.hpp"
-#include "LieMeasurementModel.hpp"
+#include "LiePositionMeasurementModel.hpp"
+#include "LieVelocityMeasurementModel.hpp"
 #include <kalman/ExtendedKalmanFilter.hpp>
 
 #include <random>
 #include <chrono>
 #include <fstream>
 
-using namespace KalmanExamples;
-
 using T = double;
 using State = Lie::State<T>;
+using SE3 = State::SE3;
+using Tangent = State::Tangent;
 // No control
 using Control = Kalman::Vector<T, 0>;
 using SystemModel = Lie::SystemModel<T>;
-using LieMeasurementModel = Lie::LieMeasurementModel<T>;
+using LiePositionMeasurementModel = Lie::LiePositionMeasurementModel<T>;
+using LieVelocityMeasurementModel = Lie::LieVelocityMeasurementModel<T>;
 using LieMeasurement = Lie::LieMeasurement<T>;
 
 struct Noise
@@ -24,7 +26,7 @@ struct Noise
 
   // Standard-Deviation of noise added to all state vector components during state transition
   T systemNoise = 0.1;
-  // Standard-Deviation of noise added to all measurement vector components
+  // Standard-Deviation of noise added to all pos_measurement vector components
   T measurementNoise = 0.025;
 
   Noise() : noise(0,1)
@@ -32,9 +34,9 @@ struct Noise
     generator.seed( std::chrono::system_clock::now().time_since_epoch().count() );
   }
 
-  LieMeasurement addNoise(const Eigen::VectorXd& m)
+  Eigen::VectorXd addNoise(const Eigen::VectorXd& m)
   {
-    LieMeasurement r;
+    Eigen::VectorXd r(m.rows());
     for (size_t i = 0; i < m.rows(); ++i) {
       r(i) = m(i) + measurementNoise * noise(generator);
     }
@@ -78,54 +80,82 @@ int main(int argc, char *argv[])
   Noise noise;
   CSVWriter csv("data.csv");
 
-  // Pure predictor without measurement update (ie groundtruth)
-  Kalman::ExtendedKalmanFilter<State> predictor;
-
   // Extended Kalman Filter
   Kalman::ExtendedKalmanFilter<State> ekf;
   SystemModel sys;
-  LieMeasurementModel measurement;
+  LiePositionMeasurementModel pos_measurement;
+  LieVelocityMeasurementModel velocity_measurement;
 
-  // Initalize system model
-  sys.velocity = State::Zero();
-  sys.velocity(0) = .1;
-  sys.velocity(1) = .2;
-  sys.velocity(2) = .3;
-  sys.velocity(4) = .1;
-  std::cout << "System velocity: " << sys.velocity.matrix().transpose() << std::endl;
+  Tangent x_init;
+  Tangent v_init;
+  v_init(0) = .1;
+  v_init(1) = .2;
+  v_init(4) = .2;
 
+  // Generate a trajectory:
+  // - From an initial position and velocity
+  Tangent v = v_init;
+  // Generate a trajectory
+  std::vector<Tangent> traj(10);
+  traj[0] = x_init;
+  for (size_t i = 1; i < traj.size(); ++i) {
+    traj[i] = SE3::log(SE3::exp(traj[i-1]) * SE3::exp(v_init));
+  }
 
   // Init filters with the true system state
   State x;
   x = State::Zero();
-  predictor.init(x);
-  ekf.init(x);
+  // Init with actual velocity
+  x.v = v_init;
+  x.x = x_init;
 
-  std::cout << "Initial State: " << x.matrix().transpose() << std::endl;
+  ekf.init(x);
+  std::cout << "Initial State: " << x.x.matrix().transpose() << ", " << x.v.matrix().transpose() << std::endl;
 
   csv() << "#x_pred;x_mes;x_ekf" << std::endl;
-  csv.write({x, x, x});
-  for(int i=0; i<5; i++)
+  csv.write({traj[0], traj[0], traj[0]});
+  velocity_measurement.addPosition(traj[0]);
+
+  // No control
+  Control u;
+
+  for(int i=1; i<traj.size(); i++)
   {
+    Tangent x_ref = traj[i];
     LieMeasurement x_mes;
-    // x: sensor state
-    // h: maps sensor to state
-    x_mes = measurement.h(noise.addNoise(x));
-    // x_mes = measurement.h(x);
+    x_mes = noise.addNoise(x_ref);
 
-    Control u;
-    x = sys.f(x, u);
-    std::cout << "New State: " << x.matrix().transpose() << std::endl;
+    // Use reference velocity for testing
+    // velocity_measurement.addPosition(x_mes);
+    velocity_measurement.addPosition(x_ref);
+    LieMeasurement v_mes = velocity_measurement.v;
 
-    ekf.update(measurement, x_mes);
+    // Simulate system (constant velocity model)
+    // x = sys.f(x, u);
+    // std::cout << "New State: " << x.x.transpose() << ", " << x.v.transpose() << std::endl;
 
     // Predict state for current time-step using the filters
-    auto x_pred = predictor.predict(sys, u);
-    auto x_ekf = ekf.predict(sys, u);
-    std::cout << "x_pred: " << x_pred.matrix().transpose() << std::endl;
-    std::cout << "x_mes: " << x_mes.matrix().transpose() << std::endl;
-    std::cout << "x_ekf: " << x_ekf.matrix().transpose() << std::endl;
-    csv.write({x_pred, x_mes, x_ekf});
+    State x_ekf = ekf.predict(sys, u);
+    std::cout << "Pred State: " << x_ekf.x.transpose() << ", " << x_ekf.v.transpose() << std::endl;
+
+    // Sensor update every 3 iteration, predict the rest of the time
+    if(i%2 == 0)
+    {
+      std::cout << "UPDATING VELOCITY" << std::endl;
+      ekf.update(velocity_measurement, v_mes);
+    }
+
+    if(i%3 == 0)
+    {
+      std::cout << "UPDATING POSITION" << std::endl;
+      ekf.update(pos_measurement, x_mes);
+    }
+
+
+    std::cout << "x_pred: " << x_ref.transpose() << std::endl;
+    std::cout << "x_mes: " << x_mes.transpose() << std::endl;
+    std::cout << "x_ekf: " << x_ekf.x.transpose() << std::endl;
+    csv.write({x_ref, x_mes, x_ekf.x});
   }
 
   return 0;
