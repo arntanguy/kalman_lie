@@ -1,34 +1,30 @@
 #pragma once
 #include <kalman/LinearizedMeasurementModel.hpp>
-#include <kalman_lie/LieTypes.hpp>
-#include <kalman_lie/NumericalDiff.hpp>
+#include "LieTypes.hpp"
+#include "NumericalDiff.hpp"
 
 namespace Lie
 {
-
 /**
- * @brief Measurement model for measuring the position of the robot
- *        using two beacon-landmarks
+ * @brief Measurement model for measuring a 6D pose
  *
- * This is the measurement model for measuring the position of the robot.
- * The measurement is given by two landmarks in the space, whose positions are known.
- * The robot can measure the direct distance to both the landmarks, for instance
- * through visual localization techniques.
+ *  This is a measurement model for measuring a 6DoF pose from direct
+ *  observations (SLAM, ...)
  *
  * @param T Numeric scalar type
  * @param CovarianceBase Class template to determine the covariance representation
  *                       (as covariance matrix (StandardBase) or as lower-triangular
  *                       coveriace square root (SquareRootBase))
  */
-template<typename T, template<class> class CovarianceBase = Kalman::StandardBase>
+template <typename T, template <class> class CovarianceBase = Kalman::StandardBase>
 class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<State<T>, LieMeasurement<T>, CovarianceBase>
 {
-public:
+   public:
     //! State type shortcut definition
-    typedef State<T> S;
+    using S = State<T>;
 
     //! Measurement type shortcut definition
-    typedef LieMeasurement<T> M;
+    using M = LieMeasurement<T>;
 
     // Wraps the system model cost function in an automatic differentiation functor
     template <typename Parent>
@@ -42,11 +38,10 @@ public:
 
         int operator()(const Eigen::VectorXd& x, Eigen::VectorXd& fvec) const
         {
-            S xx;
-            xx.x = x;
-            xx.v.setZero();
+            S s;
+            s.x = x;
             // Cost function
-            fvec = m->h(xx);
+            fvec = m->h(s);
             return 0;
         }
 
@@ -69,9 +64,10 @@ public:
      * This function maps the system state to the measurement that is expected
      * to be received from the sensor assuming the system is currently in the
      * estimated state.
+     * Here we are only interested in the pose measurement (position+orientation)
      *
      * @param [in] x The system state in current time-step
-     * @returns The (predicted) sensor measurement for the system state
+     * @returns The (predicted) pose measurement for the system state
      */
     M h(const S& x) const override
     {
@@ -80,8 +76,7 @@ public:
         return measurement;
     }
 
-protected:
-
+   protected:
     /**
      * @brief Update jacobian matrices for the system state transition function using current state
      *
@@ -97,16 +92,16 @@ protected:
      * @param x The current system state around which to linearize
      * @param u The current system control input
      */
-    void updateJacobians( const S& x )
+    void updateJacobians(const S& x)
     {
         // H = dh/dx (Jacobian of measurement function w.r.t. the state)
         this->H.setZero();
-        std::cout << this->H.rows() << ", " << this->H.cols() << std::endl;
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(6,12);
+        // 6x12 jacobian for the pose measurement update
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->H.rows(), this->H.cols());
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.x;
         num_diff.df(xx, jac);
         this->H = jac;
     }
 };
 
-} // namespace Robot
+}  // namespace Robot

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sophus/se3.hpp>
+
 // Lie Type Definition
 #define LIE_KALMAN_VECTOR(NAME, T)                                   \
     typedef typename Sophus::SE3<T>::Tangent Base;                   \
@@ -23,16 +25,15 @@
 
 namespace Lie
 {
-
 /**
  * @brief Measurement vector measuring the robot position
  *
  * @param T Numeric scalar type
  */
-template<typename T>
+template <typename T>
 class LieMeasurement : public Sophus::SE3<T>::Tangent
 {
-public:
+   public:
     LIE_KALMAN_VECTOR(LieMeasurement, T)
 };
 
@@ -49,9 +50,10 @@ class State
 {
    public:
     using Scalar = _Scalar;
-    enum {
-      RowsAtCompileTime = _Rows,
-      ColsAtCompileTime = _Cols
+    enum
+    {
+        RowsAtCompileTime = _Rows,
+        ColsAtCompileTime = _Cols
     };
 
     using SE3 = typename Sophus::SE3<Scalar>;
@@ -61,25 +63,51 @@ class State
     Tangent x;
     Tangent v;
 
+    State()
+    {
+        x.setZero();
+        v.setZero();
+    }
+
+    State(const Eigen::Matrix<_Scalar, Eigen::Dynamic, 1>& x)
+    {
+        assert(x.rows() == dim() && "State construction failed: the parameter vector does not have the correct number of state variables");
+        this->x = x.block(0, 0, 6, 1);
+        this->v = x.block(5, 0, 6, 1);
+    }
+
+    operator Eigen::Matrix<_Scalar, Eigen::Dynamic, 1>() const
+    {
+        Eigen::Matrix<_Scalar, Eigen::Dynamic, 1> res(dim(), 1);
+        res << x, v;
+        return res;
+    }
+
+    /**
+     * @brief Total number of state variables
+     */
+    constexpr int static dim()
+    {
+        return RowsAtCompileTime;
+    }
+
     static State Zero()
     {
-      State t;
-      t.x = Tangent::Zero();
-      t.v = Tangent::Zero();
-      return t;
+        State t;
+        t.x = Tangent::Zero();
+        t.v = Tangent::Zero();
+        return t;
     }
 
     // XXX should be adding a state, not a matrix
     State& operator+=(const Eigen::Matrix<_Scalar, _Rows, _Cols>& rhs)
     {
-      // XXX should this be addition?
-      // std::cout << "rhs size: " << rhs.rows() << ", " << rhs.cols() << std::endl;
-      x = SE3::log(SE3::exp(x) * SE3::exp(rhs.block(0,0,6,1)));
-      v = SE3::log(SE3::exp(v) * SE3::exp(rhs.block(5,0,6,1)));
-      return *this;
+        // XXX should this be addition?
+        // std::cout << "rhs size: " << rhs.rows() << ", " << rhs.cols() << std::endl;
+        x = SE3::log(SE3::exp(x) * SE3::exp(rhs.block(0, 0, 6, 1)));
+        v = SE3::log(SE3::exp(v) * SE3::exp(rhs.block(5, 0, 6, 1)));
+        return *this;
     }
 };
 
-
 } /* Lie */
-

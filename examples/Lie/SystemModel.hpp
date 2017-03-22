@@ -3,45 +3,34 @@
 #include <kalman/LinearizedSystemModel.hpp>
 #include <sophus/se3.hpp>
 #include <unsupported/Eigen/AutoDiff>
-#include <kalman_lie/NumericalDiff.hpp>
-#include <kalman_lie/LieTypes.hpp>
+#include "NumericalDiff.hpp"
+#include "LieTypes.hpp"
 
 namespace Lie
 {
 /**
- * @brief System control-input in se3
+ * @brief System model for constant-velocity 6D pose model
  *
- * @param T Numeric scalar type
- */
-template <typename T>
-class Control : public Sophus::SE3<T>::Tangent
-{
-   public:
-    LIE_KALMAN_VECTOR(Control, T)
-};
-
-/**
- * @brief System model for a simple planar 3DOF robot
- *
- * This is the system model defining how our robot moves from one
+ * This is the system model, defining how our pose moves from one
  * time-step to the next, i.e. how the system state evolves over time.
  *
+ * This model assumes a constant velocity, that is between measurement updates,
+ * the velocity is kept as the last known velocity.
+ *
  * @param T Numeric scalar type
- * @param CovarianceBase Class template to determine the covariance representation
- *                       (as covariance matrix (StandardBase) or as lower-triangular
- *                       coveriace square root (SquareRootBase))
  */
 template <typename T>
 class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 {
    public:
     //! State type shortcut definition
-    typedef State<T> S;
+    using S = State<T>;
 
     //! No control
-    typedef Kalman::Vector<T, 0> C;
+    using C = Kalman::Vector<T, 0>;
 
     // Wraps the system model cost function in an automatic differentiation functor
+    // XXX should be computed manually
     template <typename Parent>
     struct LieFunctor_ : Functor<T>
     {
@@ -53,23 +42,16 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 
         int operator()(const Eigen::VectorXd& x, Eigen::VectorXd& fvec) const
         {
-            C c;
-            S xx;
-            xx.x = x.block<6,1>(0,0);
-            xx.v = x.block<6,1>(5,0);
-
-            S res = m->f(xx, c);
-
-            // Cost function
-            fvec << res.x, res.v;
+            // Cost function results (with no control)
+            fvec = m->f(S(x), C());
             return 0;
         }
 
-        int inputs() const { return 12; }  // There are two parameters of the model
-        int values() const { return 12; }  // The number of observations
+        int inputs() const { return S::dim(); }  // We are differentiating wrt inputs() variables
+        int values() const { return S::dim(); }  // One observation each time
     };
     using LieFunctor = LieFunctor_<SystemModel<T>>;
-
+    // Perform numerical differentiation
     NumericalDiffFunctor<LieFunctor> num_diff;
 
     SystemModel() : num_diff(this)
@@ -83,19 +65,21 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
      * be in time-step \f$k+1\f$ given the current state \f$x_k\f$ in step \f$k\f$ and
      * the system control input \f$u\f$.
      *
+     * TODO: Give the ability to pass a user-defined timestep
+     *
      * @param [in] x The system state in current time-step
-     * @param [in] u The control vector input
+     * @param [in] u The control vector input (**unused**)
      * @returns The (predicted) system state in the next time-step
      */
-    // XXX todo pass timestep
-    S f(const S& x, const C& u) const
+    S f(const S& x, const C& /*u*/) const
     {
         //! Predicted state vector after transition
         S x_;
 
         //! Predict given current pose and velocity
-        // XXX equation for constant velocity model
+        // Constant velocity model: update position based on last known velocity
         x_.x = S::SE3::log(S::SE3::exp(x.x) * S::SE3::exp(x.v));
+        // Update velocity directly based on measurements
         x_.v = x.v;
 
         // Return transitioned state vector
@@ -107,8 +91,8 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
      * @brief Update jacobian matrices for the system state transition function using current state
      *
      * This will re-compute the (state-dependent) elements of the jacobian matrices
-     * to linearize the non-lineRowsAtCompileTimear state transition function \f$f(x,u)\f$ around the
-     * current state \f$x\f   typedef typename Functor::Scalar Scalar;
+     * to linearize the non-lineear state transition function \f$f(x,u)\f$ around the
+     * current state \f$x\f
      *
      * @note This is only needed when implementing a LinearizedSystemModel,
      *       for usage with an ExtendedKalmanFilter or SquareRootExtendedKalmanFilter.
@@ -118,17 +102,16 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
      * @param x The current system state around which to linearize
      * @param u The current system control input
      */
-    void updateJacobians(const S& x, const C& u)
+    void updateJacobians(const S& x, const C& /*u*/)
     {
-        // F = df/dx (Jacobian of state transition w.r.t. the state)
-        // this->F.setZero();
-
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(12, 12);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->F.rows(), this->F.cols());
         jac.setZero();
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx(12,1);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx(S::dim(),1);
         xx << x.x.matrix(), x.v.matrix();
+
+        // Compute numerical jacobian
+        // F = df/dx (Jacobian of state transition w.r.t. the state)
         num_diff.df(xx, jac);
-        // std::cout << "jacobian: " << jac.matrix() << std::endl;
         this->F = jac;
     }
 };

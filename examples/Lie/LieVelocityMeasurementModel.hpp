@@ -1,11 +1,10 @@
 #pragma once
 #include <kalman/LinearizedMeasurementModel.hpp>
-#include <kalman_lie/LieTypes.hpp>
-#include <kalman_lie/NumericalDiff.hpp>
+#include "LieTypes.hpp"
+#include "NumericalDiff.hpp"
 
 namespace Lie
 {
-
 /**
  * @brief Measurement model for measuring the position of the robot
  *        using two beacon-landmarks
@@ -20,10 +19,10 @@ namespace Lie
  *                       (as covariance matrix (StandardBase) or as lower-triangular
  *                       coveriace square root (SquareRootBase))
  */
-template<typename T, template<class> class CovarianceBase = Kalman::StandardBase>
+template <typename T, template <class> class CovarianceBase = Kalman::StandardBase>
 class LieVelocityMeasurementModel : public Kalman::LinearizedMeasurementModel<State<T>, LieMeasurement<T>, CovarianceBase>
 {
-public:
+   public:
     //! State type shortcut definition
     typedef State<T> S;
 
@@ -45,16 +44,15 @@ public:
 
         int operator()(const Eigen::VectorXd& v, Eigen::VectorXd& fvec) const
         {
-            S xx;
-            xx.x.setZero();
-            xx.v = v;
+            S s;
+            s.v = v;
             // Cost function
-            fvec = m->h(xx);
+            fvec = m->h(s);
             return 0;
         }
 
-        int inputs() const { return 6; }  // There are two parameters of the model
-        int values() const { return 6; }  // The number of observations
+        int inputs() const { return M::RowsAtCompileTime; }  // There are two parameters of the model
+        int values() const { return M::RowsAtCompileTime; }  // The number of observations
     };
     using LieFunctor = LieFunctor_<LieVelocityMeasurementModel<T>>;
     NumericalDiffFunctor<LieFunctor> num_diff;
@@ -66,11 +64,11 @@ public:
         this->V.setIdentity();
     }
 
-    void addPosition(const typename S::Position &pos)
+    void addPosition(const typename S::Position& pos)
     {
-      v = S::SE3::log(S::SE3::exp(x_prev).inverse() * S::SE3::exp(pos));
-      x_prev = pos;
-      std::cout << "velocity: " << v.matrix().transpose() << std::endl;
+        v = S::SE3::log(S::SE3::exp(x_prev).inverse() * S::SE3::exp(pos));
+        x_prev = pos;
+        std::cout << "velocity: " << v.matrix().transpose() << std::endl;
     }
 
     /**
@@ -90,8 +88,7 @@ public:
         return measurement;
     }
 
-protected:
-
+   protected:
     /**
      * @brief Update jacobian matrices for the system state transition function using current state
      *
@@ -107,14 +104,14 @@ protected:
      * @param x The current system state around which to linearize
      * @param u The current system control input
      */
-    void updateJacobians( const S& x )
+    void updateJacobians(const S& x)
     {
         // H = dh/dx (Jacobian of measurement function w.r.t. the state)
         // Constant velocity model
         // this->H.setIdentity();
 
         // std::cout << this->H.rows() << ", " << this->H.cols() << std::endl;
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(6,12);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->H.rows(), this->H.cols());
         jac.setZero();
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.v;
         num_diff.df(xx, jac);
@@ -122,4 +119,4 @@ protected:
     }
 };
 
-} // namespace Robot
+}  // namespace Robot
