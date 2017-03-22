@@ -58,13 +58,17 @@ struct CSVWriter
 
   void write(const std::vector<Eigen::VectorXd>& data)
   {
-    for(const auto& x : data)
+    for(size_t j=0; j<data.size(); j++)
     {
+      auto& x = data[j];
       for(size_t i=0; i<x.rows()-1; i++)
       {
         csv << x(i) << ";";
       }
       csv << x(x.size()-1);
+      if( j < data.size()-1)
+        csv << ";";
+      j++;
     }
     csv << std::endl;
   }
@@ -85,13 +89,14 @@ int main(int argc, char *argv[])
 
   // Initalize system model
   sys.velocity = State::Zero();
+  sys.velocity(0) = .1;
   sys.velocity(4) = .1;
   std::cout << "System velocity: " << sys.velocity.matrix().transpose() << std::endl;
 
 
   // Init filters with the true system state
   State x;
-  x = State::Identity();
+  x = State::Zero();
   predictor.init(x);
   ekf.init(x);
 
