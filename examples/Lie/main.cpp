@@ -61,14 +61,13 @@ struct CSVWriter
     for(size_t j=0; j<data.size(); j++)
     {
       auto& x = data[j];
-      for(size_t i=0; i<x.rows()-1; i++)
+      for(size_t i=0; i< x.rows()-1; i++)
       {
         csv << x(i) << ";";
       }
       csv << x(x.size()-1);
       if( j < data.size()-1)
         csv << ";";
-      j++;
     }
     csv << std::endl;
   }
@@ -90,6 +89,8 @@ int main(int argc, char *argv[])
   // Initalize system model
   sys.velocity = State::Zero();
   sys.velocity(0) = .1;
+  sys.velocity(1) = .2;
+  sys.velocity(2) = .3;
   sys.velocity(4) = .1;
   std::cout << "System velocity: " << sys.velocity.matrix().transpose() << std::endl;
 
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
   std::cout << "Initial State: " << x.matrix().transpose() << std::endl;
 
   csv() << "#x_pred;x_mes;x_ekf" << std::endl;
+  csv.write({x, x, x});
   for(int i=0; i<5; i++)
   {
     LieMeasurement x_mes;
