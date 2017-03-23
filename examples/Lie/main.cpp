@@ -137,7 +137,8 @@ int main(int argc, char* argv[])
         // std::cout << "New State: " << x.x.transpose() << ", " << x.v.transpose() << std::endl;
 
         // Predict state for current time-step using the filters
-        State x_ekf = ekf.predict(sys, u);
+        ekf.predict(sys, 1.);
+        State x_ekf = ekf.getState();
         std::cout << "Pred State: " << x_ekf.x.transpose() << ", " << x_ekf.v.transpose() << std::endl;
 
         // Sensor update every 3 iteration, predict the rest of the time
@@ -152,6 +153,10 @@ int main(int argc, char* argv[])
             std::cout << "UPDATING POSITION" << std::endl;
             ekf.update(pos_measurement, x_mes);
         }
+
+        auto cov = pos_measurement.getCovariance();
+        std::cout << "covariance:\n"
+                  << ekf.getCovariance().matrix() << std::endl;
 
         std::cout << "x_pred: " << x_ref.transpose() << std::endl;
         std::cout << "x_mes: " << x_mes.transpose() << std::endl;

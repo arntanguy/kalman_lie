@@ -3,8 +3,8 @@
 #include <kalman/LinearizedSystemModel.hpp>
 #include <sophus/se3.hpp>
 #include <unsupported/Eigen/AutoDiff>
-#include "NumericalDiff.hpp"
 #include "LieTypes.hpp"
+#include "NumericalDiff.hpp"
 
 namespace Lie
 {
@@ -28,6 +28,8 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 
     //! No control
     using C = Kalman::Vector<T, 0>;
+
+    using StateJacobian = Kalman::Jacobian<T, S>;
 
     // Wraps the system model cost function in an automatic differentiation functor
     // XXX should be computed manually
@@ -58,6 +60,30 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
     {
     }
 
+    // new interface
+    void predict(const S& x, const double dt, S& out)
+    {
+        std::cout << "SystemModel::predict" << std::endl;
+        out.x = S::SE3::log(S::SE3::exp(x.x) * S::SE3::exp(x.v));
+        out.v = x.v;
+    }
+
+    StateJacobian getJacobian(const S& x, const double dt)
+    {
+        std::cout << "SystemModel::getJacobian" << std::endl;
+        StateJacobian J;
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->F.rows(), this->F.cols());
+        jac.setZero();
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx(S::dim(), 1);
+        xx << x.x.matrix(), x.v.matrix();
+
+        // Compute numerical jacobian
+        // F = df/dx (Jacobian of state transition w.r.t. the state)
+        num_diff.df(xx, jac);
+        J = jac;
+        return J;
+    }
+
     /**
      * @brief Definition of (non-linear) state transition function
      * This function defines how the system state is propagated through time,
@@ -71,7 +97,7 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
      * @param [in] u The control vector input (**unused**)
      * @returns The (predicted) system state in the next time-step
      */
-    S f(const S& x, const C& /*u*/) const
+    DEPRECATED S f(const S& x, const C& /*u*/) const
     {
         //! Predicted state vector after transition
         S x_;
@@ -81,8 +107,6 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
         x_.x = S::SE3::log(S::SE3::exp(x.x) * S::SE3::exp(x.v));
         // Update velocity directly based on measurements
         x_.v = x.v;
-
-        // Return transitioned state vector
         return x_;
     }
 
@@ -102,17 +126,16 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
      * @param x The current system state around which to linearize
      * @param u The current system control input
      */
-    void updateJacobians(const S& x, const C& /*u*/)
+    DEPRECATED void updateJacobians(const S& x, const C& /*u*/)
     {
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->F.rows(), this->F.cols());
-        jac.setZero();
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx(S::dim(),1);
-        xx << x.x.matrix(), x.v.matrix();
-
-        // Compute numerical jacobian
-        // F = df/dx (Jacobian of state transition w.r.t. the state)
-        num_diff.df(xx, jac);
-        this->F = jac;
+        // Return transitioned state vector
+        // H = dh/dx (Jacobian of measurement function w.r.t. the state)
+        // this->H.setZero();
+        // // 6x12 jacobian for the pose measurement update
+        // Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->H.rows(), this->H.cols());
+        // Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.x;
+        // num_diff.df(xx, jac);
+        // this->H = jac;
     }
 };
 

@@ -26,6 +26,8 @@ class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<St
     //! Measurement type shortcut definition
     using M = LieMeasurement<T>;
 
+    using MeasurementJacobian = Kalman::Jacobian<T, S, M>;
+
     // Wraps the system model cost function in an automatic differentiation functor
     template <typename Parent>
     struct LieFunctor_ : Functor<T>
@@ -40,8 +42,10 @@ class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<St
         {
             S s;
             s.x = x;
+            M o;
             // Cost function
-            fvec = m->h(s);
+            m->measure(s, o);
+            fvec = o;
             return 0;
         }
 
@@ -67,16 +71,14 @@ class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<St
      * Here we are only interested in the pose measurement (position+orientation)
      *
      * @param [in] x The system state in current time-step
-     * @returns The (predicted) pose measurement for the system state
+     * @param [out] out The (predicted) pose measurement for the system state
      */
-    M h(const S& x) const override
+    void measure(const S& x, M& out)
     {
-        M measurement;
-        measurement = x.x;
-        return measurement;
+        std::cout << "LiePositionMeasurementModel::measure" << std::endl;
+        out = x.x;
     }
 
-   protected:
     /**
      * @brief Update jacobian matrices for the system state transition function using current state
      *
@@ -90,17 +92,28 @@ class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<St
      *       or its square-root form then this is not needed.
      *
      * @param x The current system state around which to linearize
-     * @param u The current system control input
+     * @returns J The measurement jacobian
      */
-    void updateJacobians(const S& x)
+    MeasurementJacobian getJacobian(const S& x)
     {
         // H = dh/dx (Jacobian of measurement function w.r.t. the state)
-        this->H.setZero();
+        MeasurementJacobian J;
         // 6x12 jacobian for the pose measurement update
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->H.rows(), this->H.cols());
+        jac.setZero();
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.x;
         num_diff.df(xx, jac);
-        this->H = jac;
+        J = jac;
+        return J;
+    }
+
+    DEPRECATED M h(const S& x) const override
+    {
+    }
+
+   protected:
+    DEPRECATED void updateJacobians(const S& x)
+    {
     }
 };
 

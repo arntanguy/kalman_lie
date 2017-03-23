@@ -29,6 +29,9 @@ class LieVelocityMeasurementModel : public Kalman::LinearizedMeasurementModel<St
     //! Measurement type shortcut definition
     typedef LieMeasurement<T> M;
 
+    //! Measurement Jacobian
+    using MeasurementJacobian = Kalman::Jacobian<T, S, M>;
+
     typename S::Position x_prev;
     typename S::Velocity v;
 
@@ -46,8 +49,10 @@ class LieVelocityMeasurementModel : public Kalman::LinearizedMeasurementModel<St
         {
             S s;
             s.v = v;
+            M o;
             // Cost function
-            fvec = m->h(s);
+            m->measure(s, o);
+            fvec = o;
             return 0;
         }
 
@@ -71,6 +76,25 @@ class LieVelocityMeasurementModel : public Kalman::LinearizedMeasurementModel<St
         std::cout << "velocity: " << v.matrix().transpose() << std::endl;
     }
 
+    void measure(const S& x, M& out)
+    {
+        std::cout << "LiePositionMeasurementModel::measure" << std::endl;
+        out = x.v;
+    }
+
+    MeasurementJacobian getJacobian(const S& x)
+    {
+        // H = dh/dx (Jacobian of measurement function w.r.t. the state)
+        MeasurementJacobian J;
+        // 6x12 jacobian for the pose measurement update
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->H.rows(), this->H.cols());
+        jac.setZero();
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.v;
+        num_diff.df(xx, jac);
+        J = jac;
+        return J;
+    }
+
     /**
      * @brief Definition of (possibly non-linear) measurement function
      *
@@ -81,11 +105,8 @@ class LieVelocityMeasurementModel : public Kalman::LinearizedMeasurementModel<St
      * @param [in] x The system state in current time-step
      * @returns The (predicted) sensor measurement for the system state
      */
-    M h(const S& x) const override
+    DEPRECATED M h(const S& x) const override
     {
-        M measurement;
-        measurement = x.v;
-        return measurement;
     }
 
    protected:
@@ -104,18 +125,8 @@ class LieVelocityMeasurementModel : public Kalman::LinearizedMeasurementModel<St
      * @param x The current system state around which to linearize
      * @param u The current system control input
      */
-    void updateJacobians(const S& x)
+    DEPRECATED void updateJacobians(const S& x)
     {
-        // H = dh/dx (Jacobian of measurement function w.r.t. the state)
-        // Constant velocity model
-        // this->H.setIdentity();
-
-        // std::cout << this->H.rows() << ", " << this->H.cols() << std::endl;
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(this->H.rows(), this->H.cols());
-        jac.setZero();
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.v;
-        num_diff.df(xx, jac);
-        this->H = jac;
     }
 };
 
