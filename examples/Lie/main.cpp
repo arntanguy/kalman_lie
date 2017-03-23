@@ -27,7 +27,7 @@ struct Noise
     // Standard-Deviation of noise added to all state vector components during state transition
     T systemNoise = 0.1;
     // Standard-Deviation of noise added to all pos_measurement vector components
-    T measurementNoise = 0.025;
+    T measurementNoise = 0.015;
 
     Noise() : noise(0, 1)
     {
