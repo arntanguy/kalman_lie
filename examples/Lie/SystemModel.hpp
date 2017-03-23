@@ -64,7 +64,8 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
     void predict(const S& x, const double dt, S& out)
     {
         std::cout << "SystemModel::predict" << std::endl;
-        out.x = S::SE3::log(S::SE3::exp(x.x) * S::SE3::exp(x.v));
+        // Is dt multiplication done like this correct?
+        out.x = S::SE3::log(S::SE3::exp(x.x) * S::SE3::exp(dt * x.v));
         out.v = x.v;
     }
 

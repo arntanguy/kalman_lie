@@ -121,16 +121,15 @@ int main(int argc, char* argv[])
     // No control
     Control u;
 
+    LieMeasurement x_mes;
+    LieMeasurement v_mes;
     for (int i = 1; i < traj.size(); i++)
     {
         Tangent x_ref = traj[i];
-        LieMeasurement x_mes;
-        x_mes = noise.addNoise(x_ref);
 
         // Use reference velocity for testing
         // velocity_measurement.addPosition(x_mes);
         velocity_measurement.addPosition(x_ref);
-        LieMeasurement v_mes = velocity_measurement.v;
 
         // Simulate system (constant velocity model)
         // x = sys.f(x, u);
@@ -142,15 +141,17 @@ int main(int argc, char* argv[])
         std::cout << "Pred State: " << x_ekf.x.transpose() << ", " << x_ekf.v.transpose() << std::endl;
 
         // Sensor update every 3 iteration, predict the rest of the time
-        if (i % 2 == 0)
-        {
-            std::cout << "UPDATING VELOCITY" << std::endl;
-            ekf.update(velocity_measurement, v_mes);
-        }
+        // if (i % 2 == 0)
+        // {
+        //     std::cout << "UPDATING VELOCITY" << std::endl;
+        //     v_mes = velocity_measurement.v;
+        //     ekf.update(velocity_measurement, v_mes);
+        // }
 
         if (i % 3 == 0)
         {
             std::cout << "UPDATING POSITION" << std::endl;
+            x_mes = noise.addNoise(x_ref);
             ekf.update(pos_measurement, x_mes);
         }
 
@@ -163,6 +164,10 @@ int main(int argc, char* argv[])
         std::cout << "x_ekf: " << x_ekf.x.transpose() << std::endl;
         csv.write({x_ref, x_mes, x_ekf.x});
     }
+
+    State x_future;
+    sys.predict(ekf.getState(), 5, x_future);
+    std::cout << "Future (dt=5): " << x_future.x.transpose() << std::endl;
 
     return 0;
 }
