@@ -3,8 +3,8 @@
 #include <kalman/LinearizedSystemModel.hpp>
 #include <sophus/se3.hpp>
 #include <unsupported/Eigen/AutoDiff>
-#include "LieTypes.hpp"
-#include "NumericalDiff.hpp"
+#include <kalman_lie/LieTypes.hpp>
+#include <kalman_lie/NumericalDiff.hpp>
 
 namespace Lie
 {
