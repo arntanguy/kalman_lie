@@ -104,6 +104,7 @@ class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<St
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.x;
         num_diff.df(xx, jac);
         J = jac;
+        std::cout << "jacobian pose: \n" << J << std::endl;
         return J;
     }
 

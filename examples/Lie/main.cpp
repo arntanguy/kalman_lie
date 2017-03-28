@@ -25,9 +25,9 @@ struct Noise
     std::normal_distribution<T> noise;
 
     // Standard-Deviation of noise added to all state vector components during state transition
-    T systemNoise = 0.1;
+    T systemNoise = 0.;
     // Standard-Deviation of noise added to all pos_measurement vector components
-    T measurementNoise = 0.015;
+    T measurementNoise = 0.015; // 0.005;
 
     Noise() : noise(0, 1)
     {
@@ -89,15 +89,15 @@ int main(int argc, char* argv[])
 
     Tangent x_init;
     Tangent v_init;
-    v_init(0) = .1;
-    v_init(1) = .2;
-    v_init(4) = .2;
+    v_init(0) = .05;
+    v_init(1) = .1;
+    v_init(4) = .1;
 
     // Generate a trajectory:
     // - From an initial position and velocity
     Tangent v = v_init;
     // Generate a trajectory
-    std::vector<Tangent> traj(10);
+    std::vector<Tangent> traj(20);
     traj[0] = x_init;
     for (size_t i = 1; i < traj.size(); ++i)
     {
@@ -116,20 +116,20 @@ int main(int argc, char* argv[])
 
     csv() << "#x_pred;x_mes;x_ekf" << std::endl;
     csv.write({traj[0], traj[0], traj[0]});
-    velocity_measurement.addPosition(traj[0]);
+    // velocity_measurement.addPosition(traj[0]);
 
     // No control
     Control u;
 
     LieMeasurement x_mes;
-    LieMeasurement v_mes;
+    // LieMeasurement v_mes;
     for (int i = 1; i < traj.size(); i++)
     {
         Tangent x_ref = traj[i];
 
         // Use reference velocity for testing
         // velocity_measurement.addPosition(x_mes);
-        velocity_measurement.addPosition(x_ref);
+        // velocity_measurement.addPosition(x_ref);
 
         // Simulate system (constant velocity model)
         // x = sys.f(x, u);

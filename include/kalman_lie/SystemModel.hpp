@@ -64,8 +64,7 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
     void predict(const S& x, const double dt, S& out)
     {
         std::cout << "SystemModel::predict" << std::endl;
-        // Is dt multiplication done like this correct?
-        out.x = S::SE3::log(S::SE3::exp(x.x) * S::SE3::exp(dt * x.v));
+        out.x = S::SE3::log(S::SE3::exp(dt * x.v) * S::SE3::exp(x.x));
         out.v = x.v;
     }
 
@@ -82,6 +81,7 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
         // F = df/dx (Jacobian of state transition w.r.t. the state)
         num_diff.df(xx, jac);
         J = jac;
+        std::cout << "SystemModel jacobian:\n" << J << std::endl;
         return J;
     }
 

@@ -73,7 +73,7 @@ class State
     {
         assert(x.rows() == dim() && "State construction failed: the parameter vector does not have the correct number of state variables");
         this->x = x.block(0, 0, 6, 1);
-        this->v = x.block(5, 0, 6, 1);
+        this->v = x.block(6, 0, 6, 1);
     }
 
     operator Eigen::Matrix<_Scalar, Eigen::Dynamic, 1>() const
@@ -103,9 +103,12 @@ class State
     State& operator+=(const Eigen::Matrix<_Scalar, _Rows, _Cols>& rhs)
     {
         // XXX should this be addition?
-        // std::cout << "rhs size: " << rhs.rows() << ", " << rhs.cols() << std::endl;
-        x = SE3::log(SE3::exp(x) * SE3::exp(rhs.block(0, 0, 6, 1)));
-        v = SE3::log(SE3::exp(v) * SE3::exp(rhs.block(5, 0, 6, 1)));
+        x += rhs.block(0, 0, 6, 1);
+        v += rhs.block(6, 0, 6, 1);
+        // x = SE3::log(SE3::exp(rhs.block(0, 0, 6, 1)) * SE3::exp(x));
+        // v = SE3::log(SE3::exp(rhs.block(6, 0, 6, 1)) * SE3::exp(v));
+        // std::cout << "x: " << x.transpose() << std::endl;
+        // std::cout << "v: " << v.transpose() << std::endl;
         return *this;
     }
 };
