@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package>
+  <name>lie_ros</name>
+  <version>1.0.0</version>
+  <description>Example for pose kalman using lie filters</description>
+  <maintainer email="tanguy@i3s.unice.fr">Arnaud TANGUY</maintainer>
+  <license>Copyright Arnaud TANGUY</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>tf_conversions</build_depend>
+
+
+  <run_depend>roscpp</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>tf_conversions</run_depend>
+</package>
