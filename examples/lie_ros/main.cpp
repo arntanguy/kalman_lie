@@ -8,6 +8,8 @@
 #include <random>
 #include <thread>
 
+#include <eigen_conversions/eigen_msg.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <ros/ros.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -62,6 +64,7 @@ struct TFManager
     std::shared_ptr<ros::NodeHandle> nh;
     std::unique_ptr<tf2_ros::TransformListener> tf_l;
     tf2_ros::Buffer tfBuffer;
+    ros::Subscriber pose_sub;
     double rate;
 
     bool m_spin = true;
@@ -84,6 +87,7 @@ struct TFManager
         : nh(nh), rate(rate)
     {
         tf_l = std::unique_ptr<tf2_ros::TransformListener>(new tf2_ros::TransformListener(tfBuffer));
+        pose_sub = nh->subscribe("/px2m_slam/rgb_pose", 1, &TFManager::poseCallback, this);
         m_spin_th = std::thread(std::bind(&TFManager::spinner_thread, this));
     }
 
@@ -94,6 +98,7 @@ struct TFManager
     }
 
     virtual void spinner_action() = 0;
+    virtual void poseCallback(const geometry_msgs::PoseWithCovarianceStamped&) = 0;
 };
 
 struct TFKalman : public TFManager
@@ -141,26 +146,55 @@ struct TFKalman : public TFManager
         return got_pose;
     }
 
-    //! Called by ros spinner thread
-    virtual void spinner_action() override
+    virtual void poseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg)
     {
-        Eigen::Affine3d AX_SW_xtion;
-        bool got_pose = get_pose(AX_SW_xtion);
-        if (got_pose)
+        Eigen::Affine3d pose;
+        tf::poseMsgToEigen(msg.pose.pose, pose);
+
+        Eigen::Matrix<double, 6, 6> covariance;
+        for (int i = 0; i < 36; ++i)
         {
-            // Add to Kalman
-            State::SE3 T(AX_SW_xtion.matrix());
-            LieMeasurement x_mes = State::SE3::log(T);
-            ekf.update(pos_measurement, x_mes);
+            covariance(i) = msg.pose.covariance[i];
         }
+
+        LieMeasurement x_mes = State::SE3::log(State::SE3(pose.matrix()));
+        pos_measurement.setCovariance(covariance);
+        ekf.update(pos_measurement, x_mes);
 
         // XXX use appropiate dt here
         auto dt = 0.;
         ekf.predict(sys, dt);
-        std::cout << "ekf speed: " << ekf.getState().v.transpose() << std::endl;
+
+        geometry_msgs::TransformStamped tr;
+        tr = tf2::eigenToTransform(pose);
+        tr.header.frame_id = "map";
+        tr.child_frame_id = "slam";
+        br.sendTransform(tr);
 
         // Publish
         publish_ekf();
+    }
+
+    //! Called by ros spinner thread
+    virtual void spinner_action() override
+    {
+        // Eigen::Affine3d AX_SW_xtion;
+        // bool got_pose = get_pose(AX_SW_xtion);
+        // if (got_pose)
+        // {
+        //     // Add to Kalman
+        //     State::SE3 T(AX_SW_xtion.matrix());
+        //     LieMeasurement x_mes = State::SE3::log(T);
+        //     ekf.update(pos_measurement, x_mes);
+        // }
+
+        // // XXX use appropiate dt here
+        // auto dt = 0.;
+        // ekf.predict(sys, dt);
+        // std::cout << "ekf speed: " << ekf.getState().v.transpose() << std::endl;
+
+        // // Publish
+        // publish_ekf();
     }
 
     void publish_ekf()

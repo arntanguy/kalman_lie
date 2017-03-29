@@ -4,9 +4,10 @@ find_package(catkin COMPONENTS
   roscpp
   tf
   tf_conversions
+  eigen_conversions
   REQUIRED)
 
-catkin_package(CATKIN_DEPENDS roscpp tf tf_conversions)
+catkin_package(CATKIN_DEPENDS roscpp tf tf_conversions eigen_conversions)
 
 include_directories(${catkin_INCLUDE_DIRS})
 ADD_EXECUTABLE(lie_ros main.cpp)
