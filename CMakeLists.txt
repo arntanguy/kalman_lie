@@ -10,6 +10,8 @@ set(PROJECT_VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_
 option(BUILD_LIE_EXAMPLE "Build simple Lie example." ON) 
 option(BUILD_ROS_LIE_EXAMPLE "Build ROS Lie example." ON) 
 
+option(BUILD_JOINTS_EXAMPLE "Build joints example." ON) 
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/include/kalman/cmake")
 find_package(Eigen3 REQUIRED)
 
@@ -31,4 +33,8 @@ endif()
 
 if(BUILD_ROS_LIE_EXAMPLE)
 add_subdirectory("examples/lie_ros")
+endif()
+
+if(BUILD_JOINTS_EXAMPLE)
+add_subdirectory("examples/joints")
 endif()
