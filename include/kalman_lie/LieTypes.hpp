@@ -91,6 +91,11 @@ class State
         return RowsAtCompileTime;
     }
 
+    constexpr size_t rows() const
+    {
+      return RowsAtCompileTime;
+    }
+
     static State Zero()
     {
         State t;

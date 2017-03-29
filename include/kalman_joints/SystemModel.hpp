@@ -17,17 +17,19 @@ namespace Joints
  * the velocity is kept as the last known velocity.
  *
  * @param T Numeric scalar type
- * @param N Number of joints dof
  */
-template <typename T, unsigned int N>
-class SystemModel : public Kalman::LinearizedSystemModel<State<T, N>>
+template <typename T>
+class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 {
    public:
     //! State type shortcut definition
-    using S = State<T, N>;
+    using S = State<T>;
     using StateJacobian = Kalman::Jacobian<T, S>;
     //! No control
     using C = Kalman::Vector<T, 0>;
+
+    //! Number of joints
+    size_t n_joints;
 
     // Wraps the system model cost function in an automatic differentiation functor
     // XXX should be computed manually
@@ -50,19 +52,22 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T, N>>
             return 0;
         }
 
-        int inputs() const { return S::dim(); }
-        int values() const { return S::dim(); }
+        int inputs() const { return m->n_joints; }
+        int values() const { return m->n_joints; }
     };
-    using Functor = Functor_<SystemModel<T, N>>;
+    using Functor = Functor_<SystemModel<T>>;
 
-    SystemModel()
+    SystemModel(const size_t& n_joints) : n_joints(n_joints)
     {
+        this->P.resize(n_joints*2, n_joints*2);
+        this->P.setIdentity();
     }
 
     void predict(const S& x, const double dt, S& out)
     {
-        using M = Eigen::Matrix<T, S::dim(), S::dim()>;
-        M Fk = M::Identity();
+        using M = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+        M Fk = M::Identity(x.dim(), x.dim());
+        auto N = x.q_dim();
         for (int i = 0; i < N; ++i)
         {
             Fk(i, N + i) = dt;
@@ -78,10 +83,10 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T, N>>
         // std::cout << "SystemModel::getJacobian" << std::endl;
         StateJacobian J;
         // std::cout << "J size: " << J.rows() << ", " << J.cols() << std::endl;
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(J.rows(), J.cols());
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(x.dim(), x.dim());
         jac.setZero();
         // std::cout << "jac: " << jac << std::endl;
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx(S::dim(), 1);
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx(x.dim(), 1);
         xx << x;
         // std::cout << "xx: " << xx << std::endl;
 

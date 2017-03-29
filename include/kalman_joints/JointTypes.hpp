@@ -3,69 +3,81 @@
 
 namespace Joints
 {
-
 /**
  * @brief System state vector-type for 1DoF linear joints (revolute)
  *
- * @param T Numeric scalar type
  * @param N Number of joints
  */
-template <typename T, unsigned int N>
-class State : public Kalman::Vector<T, 2 * N>
+template <typename T>
+class State : public Kalman::Vector<T, Kalman::Dynamic>
 {
    public:
-    KALMAN_VECTOR(State, T, 2 * N)
+    KALMAN_VECTOR(State, T, Kalman::Dynamic)
 
-      /**
+    State(const size_t N)
+    {
+        this->resize(N);
+    }
+
+    /**
        * @brief Set joint positions
        * @param val Joint values
        */
-    void q(const Kalman::Vector<T, N>& val)
+    void q(const Base& val)
     {
-      this->block(0, 0, N, 1) = val;
+        this->block(0, 0, q_dim(), 1) = val;
     }
 
-      /**
+    /**
        * @brief Get joint positions
        * @return[q] vector of joint positions
        */
-    Kalman::Vector<T, N> q() const
+    Base q() const
     {
-      return this->block(0, 0, N, 1);
+        return this->block(0, 0, q_dim(), 1);
     }
 
     /**
      * @brief Set joint velocities
      * @param val Joint velocities
      */
-    void q_dot(const Kalman::Vector<T, N>&  val)
+    void q_dot(const Base& val)
     {
-      this->block(N, 0, N, 1) = val;
+        this->block(q_dim(), 0, q_dim(), 1) = val;
     }
 
     /**
      * @brief Get joint velocities
      * @return[q_dot] joint velocities
      */
-    Kalman::Vector<T, N> q_dot() const
+    Base q_dot() const
     {
-        return this->block(N, 0, N, 1);
+        return this->block(q_dim(), 0, q_dim(), 1);
+    }
+
+    size_t q_dim() const
+    {
+        return dim() / 2;
     }
 
     /**
      * @brief Number of elements in the state
      */
-    constexpr static size_t dim()
+    size_t dim() const
     {
-        return 2 * N;
+        return this->rows();
     }
 };
 
-template <typename T, unsigned int N>
-class JointMeasurement : public Kalman::Vector<T, N>
+template <typename T>
+class JointMeasurement : public Kalman::Vector<T, Kalman::Dynamic>
 {
- public:
-  KALMAN_VECTOR(JointMeasurement, T, N);
+   public:
+    KALMAN_VECTOR(JointMeasurement, T, Kalman::Dynamic);
+    JointMeasurement(const size_t N)
+    {
+        this->resize(N);
+    }
 };
 
 } /* Joints */

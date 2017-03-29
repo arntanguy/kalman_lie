@@ -7,11 +7,14 @@
 #include <random>
 
 using T = double;
+// Number of joints
 constexpr size_t N = 2;
-using State = Joints::State<T, N>;
-using SystemModel = Joints::SystemModel<T, N>;
-using JointMeasurement = Joints::JointMeasurement<T, N>;
-using JointPositionMeasurementModel = Joints::JointPositionMeasurementModel<T, N>;
+// State size
+constexpr size_t Ns = N*2;
+using State = Joints::State<T>;
+using SystemModel = Joints::SystemModel<T>;
+using JointMeasurement = Joints::JointMeasurement<T>;
+using JointPositionMeasurementModel = Joints::JointPositionMeasurementModel<T>;
 
 struct Noise
 {
@@ -44,19 +47,18 @@ int main(int argc, char* argv[])
 {
     // Extended Kalman Filter
     Kalman::ExtendedKalmanFilter<State> ekf;
-    SystemModel sys;
-    JointPositionMeasurementModel pos_measurement;
+    SystemModel sys(N);
+    JointPositionMeasurementModel pos_measurement(N);
     Noise noise;
 
-
-    State x_init;
+    State x_init(Ns);
     x_init << .1, .2, 1., 1.;
     std::cout << "state: " << x_init.transpose() << std::endl;
     std::cout << "state q: " << x_init.q().transpose() << std::endl;
     std::cout << "state q_dot: " << x_init.q_dot().transpose() << std::endl;
     std::cout << std::endl;
 
-    State ekf_init;
+    State ekf_init(Ns);
     ekf_init << 0., 0., 0., 0.;
     std::cout << "ekf init: " << ekf_init.transpose() << std::endl;
     ekf.init(ekf_init);
@@ -67,13 +69,14 @@ int main(int argc, char* argv[])
     traj[0] = x_init;
     for (size_t i = 1; i < traj.size(); ++i)
     {
+        traj[i].resize(Ns);
         traj[i].q(traj[i - 1].q() + x_init.q_dot());
         traj[i].q_dot(x_init.q_dot());
     }
 
     std::cout << std::endl;
     std::cout << "Simulating a noisy trajectory" << std::endl;
-    JointMeasurement x_mes;
+    JointMeasurement x_mes(N);
     for (int i = 1; i < traj.size(); i++)
     {
       State x_ref = traj[i];

@@ -12,20 +12,19 @@ namespace Joints
  *  absolute encoders observations.
  *
  * @param T Numeric scalar type
- * @param N Numer of joints
  * @param CovarianceBase Class template to determine the covariance representation
  *                       (as covariance matrix (StandardBase) or as lower-triangular
  *                       coveriace square root (SquareRootBase))
  */
-template <typename T, unsigned int N, template <class> class CovarianceBase = Kalman::StandardBase>
-class JointPositionMeasurementModel : public Kalman::LinearizedMeasurementModel<State<T, N>, JointMeasurement<T, N>, CovarianceBase>
+template <typename T, template <class> class CovarianceBase = Kalman::StandardBase>
+class JointPositionMeasurementModel : public Kalman::LinearizedMeasurementModel<State<T>, JointMeasurement<T>, CovarianceBase>
 {
    public:
     //! State type shortcut definition
-    using S = State<T, N>;
+    using S = State<T>;
 
     //! Measurement type shortcut definition
-    using M = JointMeasurement<T, N>;
+    using M = JointMeasurement<T>;
 
     using MeasurementJacobian = Kalman::Jacobian<T, S, M>;
 
@@ -41,7 +40,7 @@ class JointPositionMeasurementModel : public Kalman::LinearizedMeasurementModel<
 
         int operator()(const Eigen::VectorXd& x, Eigen::VectorXd& fvec) const
         {
-            S s;
+            S s(m->n_joints*2);
             s.q(x);
             M o;
             // Cost function
@@ -50,17 +49,23 @@ class JointPositionMeasurementModel : public Kalman::LinearizedMeasurementModel<
             return 0;
         }
 
-        int inputs() const { return N; }  // There are two parameters of the model
-        int values() const { return N; }  // The number of observations
+        int inputs() const { return m->n_joints; }  // There are two parameters of the model
+        int values() const { return m->n_joints; }  // The number of observations
     };
-    using Functor = Functor_<JointPositionMeasurementModel<T, N>>;
+
+    size_t n_joints;
+    using Functor = Functor_<JointPositionMeasurementModel<T>>;
     NumericalDiffFunctor<Functor> num_diff;
 
-    JointPositionMeasurementModel() : num_diff(this)
+    JointPositionMeasurementModel(const size_t n_joints) : n_joints(n_joints), num_diff(this)
     {
         // Setup noise jacobian. As this one is static, we can define it once
         // and do not need to update it dynamically
+        this->V.resize(n_joints, n_joints);
         this->V.setIdentity();
+
+        this->P.resize(n_joints, n_joints);
+        this->P.setIdentity();
     }
 
     /**
@@ -99,7 +104,7 @@ class JointPositionMeasurementModel : public Kalman::LinearizedMeasurementModel<
         // H = dh/dx (Jacobian of measurement function w.r.t. the state)
         MeasurementJacobian J;
         // 6x12 jacobian for the pose measurement update
-        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(J.rows(), J.cols());
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(x.q().rows(), x.rows());
         jac.setZero();
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.q();
         num_diff.df(xx, jac);
