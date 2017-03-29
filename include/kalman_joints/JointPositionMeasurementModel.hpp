@@ -103,7 +103,7 @@ class JointPositionMeasurementModel : public Kalman::LinearizedMeasurementModel<
     {
         // H = dh/dx (Jacobian of measurement function w.r.t. the state)
         MeasurementJacobian J;
-        // 6x12 jacobian for the pose measurement update
+        // joints x state jacobian for the pose measurement update
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(x.q().rows(), x.rows());
         jac.setZero();
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xx = x.q();
