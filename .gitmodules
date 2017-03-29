@@ -1,6 +1,6 @@
 [submodule "include/kalman"]
 	path = include/kalman
-	url = https://github.com/mherb/kalman.git
+  url = https://github.com/arntanguy/kalman.git
 [submodule "include/Sophus"]
 	path = include/Sophus
 	url = https://github.com/strasdat/Sophus.git
