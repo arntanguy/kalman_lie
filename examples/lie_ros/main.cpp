@@ -153,7 +153,7 @@ struct TFKalman : public TFManager
         }
 
         // XXX use appropiate dt here
-        auto dt = 0.;
+        auto dt = 1.;
         ekf.predict(sys, dt);
         std::cout << "ekf speed: " << ekf.getState().v.transpose() << std::endl;
 
