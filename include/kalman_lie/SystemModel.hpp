@@ -37,15 +37,18 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
     struct LieFunctor_ : Functor<T>
     {
         Parent* m;
+        double dt;
 
-        LieFunctor_(Parent* m) : m(m)
+        LieFunctor_(Parent* m, const double dt) : m(m), dt(dt)
         {
         }
 
         int operator()(const Eigen::VectorXd& x, Eigen::VectorXd& fvec) const
         {
             // Cost function results (with no control)
-            fvec = m->f(S(x), C());
+            S out;
+            m->predict(S(x), dt, out);
+            fvec = out;
             return 0;
         }
 
@@ -53,10 +56,8 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
         int values() const { return S::dim(); }  // One observation each time
     };
     using LieFunctor = LieFunctor_<SystemModel<T>>;
-    // Perform numerical differentiation
-    NumericalDiffFunctor<LieFunctor> num_diff;
 
-    SystemModel() : num_diff(this)
+    SystemModel()
     {
     }
 
@@ -79,19 +80,18 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 
         // Compute numerical jacobian
         // F = df/dx (Jacobian of state transition w.r.t. the state)
+
+        // Perform numerical differentiation
+        NumericalDiffFunctor<LieFunctor> num_diff(this, dt);
         num_diff.df(xx, jac);
         J = jac;
         // std::cout << "SystemModel jacobian:\n" << J << std::endl;
         return J;
     }
 
-    DEPRECATED S f(const S& x, const C& /*u*/) const
+    DEPRECATED S f(const S& /*x*/, const C& /*u*/) const override
     {
-    }
-
-   protected:
-    DEPRECATED void updateJacobians(const S& x, const C& /*u*/)
-    {
+      return S::Zero();
     }
 };
 

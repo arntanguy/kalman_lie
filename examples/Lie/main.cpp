@@ -1,6 +1,5 @@
 #include <kalman/ExtendedKalmanFilter.hpp>
 #include <kalman_lie/LiePositionMeasurementModel.hpp>
-#include <kalman_lie/LieVelocityMeasurementModel.hpp>
 #include <kalman_lie/SystemModel.hpp>
 
 #include <chrono>
@@ -15,7 +14,6 @@ using Tangent = State::Tangent;
 using Control = Kalman::Vector<T, 0>;
 using SystemModel = Lie::SystemModel<T>;
 using LiePositionMeasurementModel = Lie::LiePositionMeasurementModel<T>;
-using LieVelocityMeasurementModel = Lie::LieVelocityMeasurementModel<T>;
 using LieMeasurement = Lie::LieMeasurement<T>;
 
 struct Noise
@@ -85,7 +83,6 @@ int main(int argc, char* argv[])
     Kalman::ExtendedKalmanFilter<State> ekf;
     SystemModel sys;
     LiePositionMeasurementModel pos_measurement;
-    LieVelocityMeasurementModel velocity_measurement;
 
     Tangent x_init;
     Tangent v_init;
@@ -116,7 +113,6 @@ int main(int argc, char* argv[])
 
     csv() << "#x_pred;x_mes;x_ekf" << std::endl;
     csv.write({traj[0], traj[0], traj[0]});
-    // velocity_measurement.addPosition(traj[0]);
 
     // No control
     Control u;
@@ -127,26 +123,10 @@ int main(int argc, char* argv[])
     {
         Tangent x_ref = traj[i];
 
-        // Use reference velocity for testing
-        // velocity_measurement.addPosition(x_mes);
-        // velocity_measurement.addPosition(x_ref);
-
-        // Simulate system (constant velocity model)
-        // x = sys.f(x, u);
-        // std::cout << "New State: " << x.x.transpose() << ", " << x.v.transpose() << std::endl;
-
         // Predict state for current time-step using the filters
         ekf.predict(sys, 1.);
         State x_ekf = ekf.getState();
         std::cout << "Pred State: " << x_ekf.x.transpose() << ", " << x_ekf.v.transpose() << std::endl;
-
-        // Sensor update every 3 iteration, predict the rest of the time
-        // if (i % 2 == 0)
-        // {
-        //     std::cout << "UPDATING VELOCITY" << std::endl;
-        //     v_mes = velocity_measurement.v;
-        //     ekf.update(velocity_measurement, v_mes);
-        // }
 
         if (i % 3 == 0)
         {

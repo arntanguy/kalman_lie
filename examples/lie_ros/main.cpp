@@ -1,6 +1,5 @@
 #include <kalman/ExtendedKalmanFilter.hpp>
 #include <kalman_lie/LiePositionMeasurementModel.hpp>
-#include <kalman_lie/LieVelocityMeasurementModel.hpp>
 #include <kalman_lie/SystemModel.hpp>
 
 #include <chrono>
@@ -22,7 +21,6 @@ using Tangent = State::Tangent;
 using Control = Kalman::Vector<T, 0>;
 using SystemModel = Lie::SystemModel<T>;
 using LiePositionMeasurementModel = Lie::LiePositionMeasurementModel<T>;
-using LieVelocityMeasurementModel = Lie::LieVelocityMeasurementModel<T>;
 using LieMeasurement = Lie::LieMeasurement<T>;
 
 struct CSVWriter

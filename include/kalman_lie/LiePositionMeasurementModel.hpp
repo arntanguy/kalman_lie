@@ -108,13 +108,9 @@ class LiePositionMeasurementModel : public Kalman::LinearizedMeasurementModel<St
         return J;
     }
 
-    DEPRECATED M h(const S& x) const override
+    DEPRECATED M h(const S& /* x */) const override
     {
-    }
-
-   protected:
-    DEPRECATED void updateJacobians(const S& x)
-    {
+      return M::Zero();
     }
 };
 
