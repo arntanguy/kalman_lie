@@ -1,7 +1,7 @@
 #pragma once
 #include <kalman/LinearizedMeasurementModel.hpp>
 #include <kalman_joints/JointTypes.hpp>
-#include <kalman_joints/NumericalDiff.hpp>
+#include <kalman_utils/NumericalDiff.hpp>
 
 namespace Joints
 {

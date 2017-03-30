@@ -4,7 +4,7 @@
 #include <sophus/se3.hpp>
 #include <unsupported/Eigen/AutoDiff>
 #include <kalman_lie/LieTypes.hpp>
-#include <kalman_lie/NumericalDiff.hpp>
+#include <kalman_utils/NumericalDiff.hpp>
 
 namespace Lie
 {

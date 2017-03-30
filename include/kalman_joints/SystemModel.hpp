@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <kalman/LinearizedSystemModel.hpp>
-#include <kalman_joints/NumericalDiff.hpp>
+#include <kalman_utils/NumericalDiff.hpp>
 #include <kalman_joints/JointTypes.hpp>
 
 namespace Joints

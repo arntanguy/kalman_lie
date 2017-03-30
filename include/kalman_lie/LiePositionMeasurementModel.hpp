@@ -1,7 +1,7 @@
 #pragma once
 #include <kalman/LinearizedMeasurementModel.hpp>
 #include <kalman_lie/LieTypes.hpp>
-#include <kalman_lie/NumericalDiff.hpp>
+#include <kalman_utils/NumericalDiff.hpp>
 
 namespace Lie
 {
