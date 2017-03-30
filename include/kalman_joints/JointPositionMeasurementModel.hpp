@@ -115,11 +115,7 @@ class JointPositionMeasurementModel : public Kalman::LinearizedMeasurementModel<
 
     DEPRECATED M h(const S& x) const override
     {
-    }
-
-   protected:
-    DEPRECATED void updateJacobians(const S& x)
-    {
+      return x.q();
     }
 };
 

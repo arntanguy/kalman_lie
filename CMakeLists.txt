@@ -25,7 +25,7 @@ include_directories(
 
 set(KALMAN_CXX_FLAGS "-std=c++11")
 # Flags
-set(CMAKE_CXX_FLAGS "${KALMAN_CXX_FLAGS}") # -Wall -pedantic -g")
+set(CMAKE_CXX_FLAGS "${KALMAN_CXX_FLAGS} -Wall -pedantic -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DEIGEN_NO_DEBUG")
 
 if(BUILD_LIE_EXAMPLE)

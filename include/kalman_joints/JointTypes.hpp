@@ -73,7 +73,7 @@ template <typename T>
 class JointMeasurement : public Kalman::Vector<T, Kalman::Dynamic>
 {
    public:
-    KALMAN_VECTOR(JointMeasurement, T, Kalman::Dynamic);
+    KALMAN_VECTOR(JointMeasurement, T, Kalman::Dynamic)
     JointMeasurement(const size_t N)
     {
         this->resize(N);

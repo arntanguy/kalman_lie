@@ -104,11 +104,7 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 
     DEPRECATED S f(const S& x, const C& /*u*/) const
     {
-    }
-
-   protected:
-    DEPRECATED void updateJacobians(const S& x, const C& /*u*/)
-    {
+      return x;
     }
 };
 
