@@ -7,6 +7,9 @@
 
 namespace Joints
 {
+template<typename T>
+using Control = typename Kalman::Vector<T, Eigen::Dynamic>;
+
 /**
  * @brief System model for joints position and velocity
  *
@@ -19,14 +22,14 @@ namespace Joints
  * @param T Numeric scalar type
  */
 template <typename T>
-class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
+class SystemModel : public Kalman::LinearizedSystemModel<State<T>, Control<T>>
 {
    public:
     //! State type shortcut definition
     using S = State<T>;
     using StateJacobian = Kalman::Jacobian<T, S>;
     //! No control
-    using C = Kalman::Vector<T, 0>;
+    using C = Control<T>;
 
     //! Number of joints
     size_t n_joints;
@@ -57,6 +60,18 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
     };
     using Functor = Functor_<SystemModel<T>>;
 
+    using M = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+    M Fk(const double dt) const
+    {
+      M Fk_;
+      Fk_ = M::Identity(n_joints*2, n_joints*2);
+      for (int i = 0; i < n_joints; ++i)
+      {
+        Fk_(i, n_joints + i) = dt;
+      }
+      return Fk_;
+    }
+
     SystemModel(const size_t& n_joints) : n_joints(n_joints)
     {
         this->P.resize(n_joints*2, n_joints*2);
@@ -65,24 +80,23 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
 
     void predict(const S& x, const double dt, S& out)
     {
-        using M = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-        M Fk = M::Identity(x.dim(), x.dim());
-        auto N = x.q_dim();
-        for (int i = 0; i < N; ++i)
-        {
-            Fk(i, N + i) = dt;
-        }
-
         // System model
         // xk+1 = xk+ xk_dot*dt
-        out = Fk * x;
+        out = Fk(dt) * x;
+    }
+
+    void predict(const S& x, const C& u, const double dt, S& out)
+    {
+        // System model
+        // xk+1 = xk+ xk_dot*dt
+        out = Fk(dt) * x + u;
     }
 
     StateJacobian getJacobian(const S& x, const double dt)
     {
         // std::cout << "SystemModel::getJacobian" << std::endl;
         StateJacobian J;
-        // std::cout << "J size: " << J.rows() << ", " << J.cols() << std::endl;
+        // std::cout << "J size: " <crashtest< J.rows() << ", " << J.cols() << std::endl;
         Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> jac(x.dim(), x.dim());
         jac.setZero();
         // std::cout << "jac: " << jac << std::endl;
@@ -97,12 +111,22 @@ class SystemModel : public Kalman::LinearizedSystemModel<State<T>>
         num_diff.df(xx, jac);
         // std::cout << "num_diff" << std::endl;
         J = jac;
-        // std::cout << "SystemModel jacobian:\n"
-        //           << J << std::endl;
+        std::cout << "SystemModel jacobian (no control):\n"
+                  << J << std::endl;
         return J;
     }
 
-    DEPRECATED S f(const S& x, const C& /*u*/) const
+    StateJacobian getJacobian(const S& x, const C& u, const double dt)
+    {
+        // std::cout << "SystemModel::getJacobian" << std::endl;
+        StateJacobian J;
+        J.resize(x.dim(), x.dim());
+        J = Fk(dt);
+        std::cout << "SystemModel Jacobian (with control):\n" << J << std::endl;
+        return J;
+    }
+
+    DEPRECATED S f(const S& x, const C& /*u*/) const override
     {
       return x;
     }

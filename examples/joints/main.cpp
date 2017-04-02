@@ -15,6 +15,7 @@ using State = Joints::State<T>;
 using SystemModel = Joints::SystemModel<T>;
 using JointMeasurement = Joints::JointMeasurement<T>;
 using JointPositionMeasurementModel = Joints::JointPositionMeasurementModel<T>;
+using Control = Joints::Control<T>;
 
 struct Noise
 {
@@ -47,8 +48,11 @@ int main(int argc, char* argv[])
 {
     // Extended Kalman Filter
     Kalman::ExtendedKalmanFilter<State> ekf;
+    Kalman::ExtendedKalmanFilter<State> ekf_with_control;
     SystemModel sys(N);
+    SystemModel sys_with_control(N);
     JointPositionMeasurementModel pos_measurement(N);
+    JointPositionMeasurementModel pos_measurement_with_control(N);
     Noise noise;
 
     State x_init(Ns);
@@ -62,6 +66,7 @@ int main(int argc, char* argv[])
     ekf_init << 0., 0., 0., 0.;
     std::cout << "ekf init: " << ekf_init.transpose() << std::endl;
     ekf.init(ekf_init);
+    ekf_with_control.init(ekf_init);
 
 
     // Generate a trajectory
@@ -71,7 +76,7 @@ int main(int argc, char* argv[])
     {
         traj[i].resize(Ns);
         traj[i].q(traj[i - 1].q() + x_init.q_dot());
-        traj[i].q_dot(x_init.q_dot());
+        traj[i].q_dot(traj[i].q() - traj[i-1].q());
     }
 
     std::cout << std::endl;
@@ -80,22 +85,31 @@ int main(int argc, char* argv[])
     for (int i = 1; i < traj.size(); i++)
     {
       State x_ref = traj[i];
+      // XXX Need speed measurement for this?
+      Control u = traj[i]-traj[i-1];
+      std::cout << "u: " << u << std::endl;
 
       ekf.predict(sys, 1);
+      ekf_with_control.predict(sys_with_control, u, 1);
       State x_ekf = ekf.getState();
-      std::cout << "Pred State: " << x_ekf.q().transpose() << ", " << x_ekf.q_dot().transpose() << std::endl;
       std::cout << "Ref: " << x_ref.q().transpose() << ", " << x_ref.q_dot().transpose() << std::endl;
+      std::cout << "Pred State (no control): \n\t" << x_ekf.q().transpose() << ", " << x_ekf.q_dot().transpose() << std::endl;
+      State x_ekf_u = ekf_with_control.getState();
+      std::cout << "Pred State (control): \n\t" << x_ekf_u.q().transpose() << ", " << x_ekf_u.q_dot().transpose() << std::endl;
 
       if (i % 3 == 0)
       {
           std::cout << "UPDATING POSITION" << std::endl;
           x_mes = noise.addNoise(x_ref.q());
           ekf.update(pos_measurement, x_mes);
+          ekf_with_control.update(pos_measurement_with_control, x_mes);
       }
     }
 
     State x_future;
     sys.predict(ekf.getState(), 5, x_future);
-    std::cout << "Future (dt=5): " << x_future.transpose() << std::endl;
+    std::cout << "Future (dt=5) (no control): " << x_future.transpose() << std::endl;
+    sys_with_control.predict(ekf_with_control.getState(), 5, x_future);
+    std::cout << "Future (dt=5) (control): " << x_future.transpose() << std::endl;
     return 0;
 }
